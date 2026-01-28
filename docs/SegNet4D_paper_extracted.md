@@ -6011,6 +6011,4 @@ Authorized licensed use limited to: Hebei University of Technology. Downloaded o
 
 ![page_12_img_8.png](paper_images/page_12_img_8.png)
 
-*[无法提取图片: page_12_img_8_failed]*
-
 
