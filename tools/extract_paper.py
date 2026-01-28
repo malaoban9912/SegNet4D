@@ -144,54 +144,63 @@ def extract_images_from_pdf(pdf_path, images_dir, verbose=False):
     Returns:
         list: List of tuples (page_num, image_index, image_path)
     """
-    doc = fitz.open(pdf_path)
     extracted_images = []
     
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        image_list = page.get_images(full=True)
-        
-        if verbose:
-            print(f"Page {page_num + 1}: Found {len(image_list)} images")
-        
-        for img_index, img in enumerate(image_list):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            image_ext = base_image["ext"]
-            
-            # Generate image filename
-            image_filename = f"page_{page_num + 1:02d}_img_{img_index + 1}.{image_ext}"
-            image_path = os.path.join(images_dir, image_filename)
-            
-            # Save the image
-            with open(image_path, "wb") as img_file:
-                img_file.write(image_bytes)
-            
-            # Try to convert to PNG if Pillow is available and it's not already PNG
-            if PILLOW_AVAILABLE and image_ext.lower() != 'png':
-                try:
-                    img_obj = Image.open(image_path)
-                    png_filename = f"page_{page_num + 1:02d}_img_{img_index + 1}.png"
-                    png_path = os.path.join(images_dir, png_filename)
-                    img_obj.save(png_path, 'PNG')
-                    
-                    # Remove the original if conversion was successful
-                    os.remove(image_path)
-                    image_path = png_path
-                    
-                    if verbose:
-                        print(f"  Converted {image_filename} to PNG")
-                except Exception as e:
-                    if verbose:
-                        print(f"  Warning: Could not convert {image_filename} to PNG: {e}")
-            
-            extracted_images.append((page_num + 1, img_index + 1, image_path))
+    with fitz.open(pdf_path) as doc:
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            image_list = page.get_images(full=True)
             
             if verbose:
-                print(f"  Saved: {os.path.basename(image_path)}")
+                print(f"Page {page_num + 1}: Found {len(image_list)} images")
+            
+            for img_index, img in enumerate(image_list):
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                image_bytes = base_image["image"]
+                image_ext = base_image["ext"]
+                
+                # Generate image filename (sanitize to prevent directory traversal)
+                image_filename = f"page_{page_num + 1:02d}_img_{img_index + 1}.{image_ext}"
+                # Ensure the path stays within images_dir
+                image_path = os.path.abspath(os.path.join(images_dir, image_filename))
+                if not image_path.startswith(os.path.abspath(images_dir)):
+                    if verbose:
+                        print(f"  Warning: Skipping potentially unsafe path: {image_filename}")
+                    continue
+                
+                # Save the image
+                with open(image_path, "wb") as img_file:
+                    img_file.write(image_bytes)
+                
+                # Try to convert to PNG if Pillow is available and it's not already PNG
+                if PILLOW_AVAILABLE and image_ext.lower() != 'png':
+                    try:
+                        img_obj = Image.open(image_path)
+                        png_filename = f"page_{page_num + 1:02d}_img_{img_index + 1}.png"
+                        png_path = os.path.abspath(os.path.join(images_dir, png_filename))
+                        if not png_path.startswith(os.path.abspath(images_dir)):
+                            if verbose:
+                                print(f"  Warning: Skipping potentially unsafe PNG path: {png_filename}")
+                            continue
+                        
+                        img_obj.save(png_path, 'PNG')
+                        
+                        # Remove the original if conversion was successful
+                        os.remove(image_path)
+                        image_path = png_path
+                        
+                        if verbose:
+                            print(f"  Converted {image_filename} to PNG")
+                    except Exception as e:
+                        if verbose:
+                            print(f"  Warning: Could not convert {image_filename} to PNG: {e}")
+                
+                extracted_images.append((page_num + 1, img_index + 1, image_path))
+                
+                if verbose:
+                    print(f"  Saved: {os.path.basename(image_path)}")
     
-    doc.close()
     return extracted_images
 
 
@@ -206,18 +215,17 @@ def extract_text_from_pdf(pdf_path, verbose=False):
     Returns:
         str: Extracted text from all pages
     """
-    doc = fitz.open(pdf_path)
     full_text = []
     
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        text = page.get_text()
-        full_text.append(text)
-        
-        if verbose:
-            print(f"Page {page_num + 1}: Extracted {len(text)} characters")
+    with fitz.open(pdf_path) as doc:
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            text = page.get_text()
+            full_text.append(text)
+            
+            if verbose:
+                print(f"Page {page_num + 1}: Extracted {len(text)} characters")
     
-    doc.close()
     return '\n'.join(full_text)
 
 
