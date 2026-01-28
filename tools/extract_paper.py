@@ -33,29 +33,33 @@ except ImportError:
 
 
 # Common section headings to detect (English and Chinese)
+# Patterns now support Roman numerals, letters, and numbers as section markers
 SECTION_PATTERNS = [
-    (r'^\s*abstract\s*$', 'Abstract'),
+    (r'^\s*(?:[IVX]+\.?\s+)?abstract\s*$', 'Abstract'),
     (r'^\s*摘\s*要\s*$', '摘要'),
-    (r'^\s*introduction\s*$', 'Introduction'),
+    (r'^\s*(?:[IVX]+\.?\s+)?introduction\s*$', 'Introduction'),
     (r'^\s*引\s*言\s*$', '引言'),
-    (r'^\s*related\s+work\s*$', 'Related Work'),
+    (r'^\s*(?:[IVX]+\.?\s+)?(?:related\s+work|literature\s+review|background)\s*$', 'Related Work'),
     (r'^\s*相\s*关\s*工\s*作\s*$', '相关工作'),
-    (r'^\s*method\s*$', 'Method'),
+    (r'^\s*(?:[IVX]+\.?\s+)?(?:method|methodology|approach|proposed\s+method)\s*$', 'Method'),
     (r'^\s*方\s*法\s*$', '方法'),
-    (r'^\s*methodology\s*$', 'Methodology'),
-    (r'^\s*experiments?\s*$', 'Experiments'),
+    (r'^\s*(?:[IVX]+\.?\s+)?(?:network\s+architecture|architecture)\s*$', 'Network Architecture'),
+    (r'^\s*(?:[IVX]+\.?\s+)?(?:experiments?|experimental\s+(?:setup|results))\s*$', 'Experiments'),
     (r'^\s*实\s*验\s*$', '实验'),
-    (r'^\s*results?\s*$', 'Results'),
+    (r'^\s*(?:[IVX]+\.?\s+)?(?:results?|evaluation)\s*$', 'Results'),
     (r'^\s*结\s*果\s*$', '结果'),
-    (r'^\s*discussion\s*$', 'Discussion'),
+    (r'^\s*(?:[IVX]+\.?\s+)?discussion\s*$', 'Discussion'),
     (r'^\s*讨\s*论\s*$', '讨论'),
-    (r'^\s*conclusions?\s*$', 'Conclusion'),
+    (r'^\s*(?:[IVX]+\.?\s+)?conclusions?\s*$', 'Conclusion'),
     (r'^\s*结\s*论\s*$', '结论'),
-    (r'^\s*acknowledgments?\s*$', 'Acknowledgment'),
+    (r'^\s*(?:[IVX]+\.?\s+)?acknowledgments?\s*$', 'Acknowledgment'),
     (r'^\s*致\s*谢\s*$', '致谢'),
-    (r'^\s*references?\s*$', 'References'),
+    (r'^\s*(?:[IVX]+\.?\s+)?references?\s*$', 'References'),
     (r'^\s*参\s*考\s*文\s*献\s*$', '参考文献'),
 ]
+
+# Subsection patterns (A, B, C or 1, 2, 3 with descriptive names)
+SUBSECTION_PATTERN = r'^\s*(?:[A-Z]\.?|[0-9]+\.?)\s+[A-Z][a-zA-Z\s]{3,50}$'
 
 
 def extract_title_and_authors(text):
@@ -95,39 +99,77 @@ def extract_title_and_authors(text):
 def detect_sections(text):
     """
     Detect sections in the text based on common headings.
+    Also detects subsections for more granular parsing.
     
     Args:
         text: Full text from the PDF
         
     Returns:
-        dict: Dictionary mapping section names to their content
+        dict: Ordered dictionary mapping section names to their content
     """
+    from collections import OrderedDict
+    
     lines = text.split('\n')
-    sections = {}
-    current_section = "Introduction"
+    sections = OrderedDict()
+    current_section = None
+    current_subsection = None
     section_content = []
     
-    for line in lines:
-        # Check if this line matches any section pattern
-        matched = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        
+        # Skip very short lines and lines that are just numbers
+        if len(stripped) < 2 or stripped.isdigit():
+            section_content.append(line)
+            continue
+        
+        # Check if this line matches any main section pattern
+        matched_section = False
         for pattern, section_name in SECTION_PATTERNS:
-            if re.match(pattern, line.strip(), re.IGNORECASE):
-                # Save previous section
-                if section_content:
-                    sections[current_section] = '\n'.join(section_content).strip()
+            if re.match(pattern, stripped, re.IGNORECASE):
+                # Save previous section content
+                if current_section and section_content:
+                    if current_subsection:
+                        section_key = f"{current_section} - {current_subsection}"
+                    else:
+                        section_key = current_section
+                    sections[section_key] = '\n'.join(section_content).strip()
                 
                 # Start new section
                 current_section = section_name
+                current_subsection = None
                 section_content = []
-                matched = True
+                matched_section = True
                 break
         
-        if not matched:
-            section_content.append(line)
+        if matched_section:
+            continue
+        
+        # Check for subsection patterns (only if we're in a main section)
+        if current_section and re.match(SUBSECTION_PATTERN, stripped):
+            # Save previous subsection content
+            if section_content:
+                if current_subsection:
+                    section_key = f"{current_section} - {current_subsection}"
+                else:
+                    section_key = current_section
+                sections[section_key] = '\n'.join(section_content).strip()
+            
+            # Start new subsection
+            current_subsection = stripped
+            section_content = []
+            continue
+        
+        # Add line to current section content
+        section_content.append(line)
     
     # Save the last section
-    if section_content:
-        sections[current_section] = '\n'.join(section_content).strip()
+    if current_section and section_content:
+        if current_subsection:
+            section_key = f"{current_section} - {current_subsection}"
+        else:
+            section_key = current_section
+        sections[section_key] = '\n'.join(section_content).strip()
     
     return sections
 
@@ -231,7 +273,7 @@ def extract_text_from_pdf(pdf_path, verbose=False):
 
 def generate_markdown(title, authors, sections, extracted_images, images_dir, out_md, verbose=False):
     """
-    Generate a Markdown file with extracted content.
+    Generate a detailed Markdown file with extracted content.
     
     Args:
         title: Paper title
@@ -245,27 +287,62 @@ def generate_markdown(title, authors, sections, extracted_images, images_dir, ou
     with open(out_md, 'w', encoding='utf-8') as f:
         # Write title and authors
         f.write(f"# {title}\n\n")
-        f.write(f"**Authors:** {authors}\n\n")
+        f.write(f"**作者 (Authors):** {authors}\n\n")
+        f.write("---\n\n")
+        
+        # Write overview
+        f.write("## 论文概述 (Overview)\n\n")
+        f.write("本文档为 SegNet4D 论文的详细解析，包含全文提取、章节划分、图片提取等内容。\n\n")
+        f.write("This document provides a detailed analysis of the SegNet4D paper, including full text extraction, section division, and image extraction.\n\n")
         f.write("---\n\n")
         
         # Write table of contents
-        f.write("## Table of Contents\n\n")
+        f.write("## 目录 (Table of Contents)\n\n")
         for section_name in sections.keys():
-            # Create anchor link (lowercase, replace spaces with hyphens)
-            anchor = section_name.lower().replace(' ', '-')
+            # Create anchor link (lowercase, replace spaces with hyphens, handle special chars)
+            anchor = section_name.lower().replace(' ', '-').replace('/', '').replace('.', '')
             f.write(f"- [{section_name}](#{anchor})\n")
         f.write("\n---\n\n")
         
-        # Write sections
+        # Write sections with detailed formatting
         for section_name, content in sections.items():
-            f.write(f"## {section_name}\n\n")
-            f.write(f"{content}\n\n")
-            f.write("<!-- 待后续进行更详细的中文解析 -->\n\n")
+            # Main section header
+            if ' - ' in section_name:
+                # This is a subsection
+                main_section, subsection = section_name.split(' - ', 1)
+                f.write(f"## {main_section}\n\n")
+                f.write(f"### {subsection}\n\n")
+            else:
+                f.write(f"## {section_name}\n\n")
+            
+            # Write content with proper formatting
+            if content.strip():
+                # Split content into paragraphs for better readability
+                paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+                
+                for para in paragraphs:
+                    # Clean up the paragraph
+                    para = para.replace('\n', ' ').strip()
+                    if para:
+                        f.write(f"{para}\n\n")
+            else:
+                f.write("*(Section content to be extracted)*\n\n")
+            
+            # Add placeholder for detailed Chinese analysis
+            f.write("**详细解析 (Detailed Analysis):**\n\n")
+            f.write("<!-- 待后续进行更详细的中文解析 -->\n")
+            f.write("<!-- This section is reserved for detailed Chinese analysis -->\n\n")
+            
+            # Check if there are relevant images for this section
+            # (Could be enhanced to match images to sections based on page numbers)
+            
             f.write("---\n\n")
         
         # Write extracted images section
         if extracted_images:
-            f.write("## Extracted Images\n\n")
+            f.write("## 提取的图片 (Extracted Images)\n\n")
+            f.write("以下是从论文中提取的所有图片，按页码分组。\n\n")
+            f.write("Below are all images extracted from the paper, grouped by page number.\n\n")
             
             # Group images by page
             images_by_page = {}
@@ -275,16 +352,29 @@ def generate_markdown(title, authors, sections, extracted_images, images_dir, ou
                 images_by_page[page_num].append((img_index, img_path))
             
             for page_num in sorted(images_by_page.keys()):
-                f.write(f"### Page {page_num}\n\n")
+                f.write(f"### 第 {page_num} 页 (Page {page_num})\n\n")
                 for img_index, img_path in images_by_page[page_num]:
                     # Create relative path for markdown
                     rel_path = os.path.relpath(img_path, os.path.dirname(out_md))
+                    # Use forward slashes for markdown compatibility
+                    rel_path = rel_path.replace('\\', '/')
+                    f.write(f"**图片 {img_index} (Image {img_index}):**\n\n")
                     f.write(f"![Page {page_num} Image {img_index}]({rel_path})\n\n")
             
             f.write("---\n\n")
+        
+        # Write footer
+        f.write("## 说明 (Notes)\n\n")
+        f.write(f"- **提取日期 (Extraction Date):** {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"- **章节数量 (Number of Sections):** {len(sections)}\n")
+        f.write(f"- **图片数量 (Number of Images):** {len(extracted_images)}\n")
+        f.write("\n本文档由 PDF 提取工具自动生成。如需更详细的解析，请参考原始论文 PDF。\n\n")
+        f.write("This document was automatically generated by the PDF extraction tool. For more detailed analysis, please refer to the original paper PDF.\n\n")
     
     if verbose:
         print(f"Markdown file generated: {out_md}")
+        print(f"Total sections: {len(sections)}")
+        print(f"Total images: {len(extracted_images)}")
 
 
 def main():
