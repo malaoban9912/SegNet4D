@@ -15,6 +15,8 @@ import os
 import re
 import sys
 from pathlib import Path
+from collections import OrderedDict
+from datetime import datetime
 
 # Check if PyMuPDF is available
 try:
@@ -59,7 +61,8 @@ SECTION_PATTERNS = [
 ]
 
 # Subsection patterns (A, B, C or 1, 2, 3 with descriptive names)
-SUBSECTION_PATTERN = r'^\s*(?:[A-Z]\.?|[0-9]+\.?)\s+[A-Z][a-zA-Z\s]{3,50}$'
+# More restrictive: requires period after letter/number
+SUBSECTION_PATTERN = r'^\s*(?:[A-Z]\.|[0-9]+\.)\s+[A-Z][a-zA-Z\s]{3,50}$'
 
 
 def extract_title_and_authors(text):
@@ -107,8 +110,6 @@ def detect_sections(text):
     Returns:
         dict: Ordered dictionary mapping section names to their content
     """
-    from collections import OrderedDict
-    
     lines = text.split('\n')
     sections = OrderedDict()
     current_section = None
@@ -129,10 +130,8 @@ def detect_sections(text):
             if re.match(pattern, stripped, re.IGNORECASE):
                 # Save previous section content
                 if current_section and section_content:
-                    if current_subsection:
-                        section_key = f"{current_section} - {current_subsection}"
-                    else:
-                        section_key = current_section
+                    # Use tuple as key to avoid separator issues
+                    section_key = (current_section, current_subsection) if current_subsection else (current_section, None)
                     sections[section_key] = '\n'.join(section_content).strip()
                 
                 # Start new section
@@ -149,13 +148,10 @@ def detect_sections(text):
         if current_section and re.match(SUBSECTION_PATTERN, stripped):
             # Save previous subsection content
             if section_content:
-                if current_subsection:
-                    section_key = f"{current_section} - {current_subsection}"
-                else:
-                    section_key = current_section
+                section_key = (current_section, current_subsection) if current_subsection else (current_section, None)
                 sections[section_key] = '\n'.join(section_content).strip()
             
-            # Start new subsection
+            # Start new subsection (store just the heading text)
             current_subsection = stripped
             section_content = []
             continue
@@ -165,10 +161,7 @@ def detect_sections(text):
     
     # Save the last section
     if current_section and section_content:
-        if current_subsection:
-            section_key = f"{current_section} - {current_subsection}"
-        else:
-            section_key = current_section
+        section_key = (current_section, current_subsection) if current_subsection else (current_section, None)
         sections[section_key] = '\n'.join(section_content).strip()
     
     return sections
@@ -278,12 +271,22 @@ def generate_markdown(title, authors, sections, extracted_images, images_dir, ou
     Args:
         title: Paper title
         authors: Paper authors
-        sections: Dictionary of sections
+        sections: Dictionary of sections (keys are tuples: (section, subsection))
         extracted_images: List of extracted images
         images_dir: Directory where images are saved
         out_md: Output markdown file path
         verbose: Whether to print verbose output
     """
+    def make_anchor(text):
+        """Create a valid markdown anchor from text."""
+        # Convert to lowercase, replace spaces with hyphens, remove special chars
+        anchor = text.lower().replace(' ', '-').replace('/', '').replace('.', '').replace(',', '')
+        # Remove any consecutive hyphens
+        anchor = re.sub(r'-+', '-', anchor)
+        # Strip leading/trailing hyphens
+        anchor = anchor.strip('-')
+        return anchor
+    
     with open(out_md, 'w', encoding='utf-8') as f:
         # Write title and authors
         f.write(f"# {title}\n\n")
@@ -298,22 +301,29 @@ def generate_markdown(title, authors, sections, extracted_images, images_dir, ou
         
         # Write table of contents
         f.write("## 目录 (Table of Contents)\n\n")
-        for section_name in sections.keys():
-            # Create anchor link (lowercase, replace spaces with hyphens, handle special chars)
-            anchor = section_name.lower().replace(' ', '-').replace('/', '').replace('.', '')
-            f.write(f"- [{section_name}](#{anchor})\n")
+        for section_key in sections.keys():
+            section, subsection = section_key
+            if subsection:
+                display_name = f"{section} - {subsection}"
+            else:
+                display_name = section
+            anchor = make_anchor(display_name)
+            f.write(f"- [{display_name}](#{anchor})\n")
         f.write("\n---\n\n")
         
-        # Write sections with detailed formatting
-        for section_name, content in sections.items():
-            # Main section header
-            if ' - ' in section_name:
-                # This is a subsection
-                main_section, subsection = section_name.split(' - ', 1)
-                f.write(f"## {main_section}\n\n")
+        # Write sections with proper hierarchy (avoid duplicate headers)
+        prev_section = None
+        for section_key, content in sections.items():
+            section, subsection = section_key
+            
+            # Write main section header only when it changes
+            if section != prev_section:
+                f.write(f"## {section}\n\n")
+                prev_section = section
+            
+            # Write subsection header if present
+            if subsection:
                 f.write(f"### {subsection}\n\n")
-            else:
-                f.write(f"## {section_name}\n\n")
             
             # Write content with proper formatting
             if content.strip():
@@ -332,9 +342,6 @@ def generate_markdown(title, authors, sections, extracted_images, images_dir, ou
             f.write("**详细解析 (Detailed Analysis):**\n\n")
             f.write("<!-- 待后续进行更详细的中文解析 -->\n")
             f.write("<!-- This section is reserved for detailed Chinese analysis -->\n\n")
-            
-            # Check if there are relevant images for this section
-            # (Could be enhanced to match images to sections based on page numbers)
             
             f.write("---\n\n")
         
@@ -365,7 +372,7 @@ def generate_markdown(title, authors, sections, extracted_images, images_dir, ou
         
         # Write footer
         f.write("## 说明 (Notes)\n\n")
-        f.write(f"- **提取日期 (Extraction Date):** {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"- **提取日期 (Extraction Date):** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"- **章节数量 (Number of Sections):** {len(sections)}\n")
         f.write(f"- **图片数量 (Number of Images):** {len(extracted_images)}\n")
         f.write("\n本文档由 PDF 提取工具自动生成。如需更详细的解析，请参考原始论文 PDF。\n\n")
@@ -465,7 +472,9 @@ Examples:
         print("Detecting sections...")
     sections = detect_sections(full_text)
     if args.verbose:
-        print(f"Found {len(sections)} sections: {', '.join(sections.keys())}")
+        # Format section keys for display
+        section_names = [f"{s} - {sub}" if sub else s for s, sub in sections.keys()]
+        print(f"Found {len(sections)} sections: {', '.join(section_names)}")
         print()
     
     # Extract images

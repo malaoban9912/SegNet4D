@@ -15,15 +15,15 @@ This document provides a detailed analysis of the SegNet4D paper, including full
 ## 目录 (Table of Contents)
 
 - [Introduction](#introduction)
-- [Related Work - A. Moving Object Segmentation](#related-work---a-moving-object-segmentation)
+- [Related Work - A. Moving Object Segmentation](#related-work-a-moving-object-segmentation)
 - [Method](#method)
-- [Method - A. Motion Feature Encoding Module](#method---a-motion-feature-encoding-module)
-- [Method - C. Motion Head and Semantic Head](#method---c-motion-head-and-semantic-head)
-- [Method - F. Loss Function](#method---f-loss-function)
-- [Method - B. Evaluation for Moving Object Segmentation](#method---b-evaluation-for-moving-object-segmentation)
-- [Method - D. Ablation Study](#method---d-ablation-study)
-- [Method - E. Runtime Analysis](#method---e-runtime-analysis)
-- [Method - V. CONCLUSION AND FUTURE WORK](#method---v-conclusion-and-future-work)
+- [Method - A. Motion Feature Encoding Module](#method-a-motion-feature-encoding-module)
+- [Method - C. Motion Head and Semantic Head](#method-c-motion-head-and-semantic-head)
+- [Method - F. Loss Function](#method-f-loss-function)
+- [Method - B. Evaluation for Moving Object Segmentation](#method-b-evaluation-for-moving-object-segmentation)
+- [Method - D. Ablation Study](#method-d-ablation-study)
+- [Method - E. Runtime Analysis](#method-e-runtime-analysis)
+- [Method - V. CONCLUSION AND FUTURE WORK](#method-v-conclusion-and-future-work)
 - [References](#references)
 
 ---
@@ -67,8 +67,6 @@ The framework of our proposed method is depicted in Fig. 2. SegNet4D consists of
 
 ---
 
-## Method
-
 ### A. Motion Feature Encoding Module
 
 4D semantic segmentation not only predicts the semantic category for each point measured by LiDAR but also identiﬁes its motion state. Therefore, it is necessary to extract motion features from the sequential point clouds. Existing methods mainly utilize 4D convolution [26], [27] to obtain motion cues, which poses a signiﬁcant computational workload. To improve the real-time performance, we adopt the BEV image representation for fast motion feature encoding, as shown in Fig. 3, which avoids computational expense processing on extensive unstructured point cloud data. The encoding process is divided into three steps as follows. 1) Point Cloud Alignment: To compensate for the ego- motion of LiDAR, spatial alignment is conducted initially on the input sequential point clouds. Speciﬁcally, given the current point cloud S0 = {pi ∈ R4}M i=1 consisting of M points represented in homogeneous coordinates as pi [xi, yi, zi, 1]T, along with the past N − 1 consecutive point= clouds S1, S2, . . . , SN−1 with their relative transformations T0 1, T1 2, . . . , TN−2 N−1, we transform the past N−1 consecutive point clouds into the current viewpoint by S j→0 = {p′ i = T0 j pi|pi ∈ S j}, T0 j= j−1 Y k=0 T j−k−1 j−k . (1) Fig. 4. Motion features visualization. (a) and (b) represent the motion features obtained from the current and past N-th scan. We compare the features with the network’s predictions as well as ground truth. In practical applications, the relative transformations can be easily obtained through the existing LiDAR odome- try approach [4], [7]. We use the poses estimated by SuMa [7]. 2) BEV Projection: After alignment, we project the aligned point clouds into single-channel BEV images. For each point p′ j = (x′ j, y′ j, z′ j) ∈ S j→0, we ﬁrst restrict it within x′ j ∈ [Xmin, Xmax], y′ j ∈ [Ymin, Ymax], z′ j ∈ [Zmin, Zmax] and then convert it into the pillar space, given by 8 ˆˆˆˆ< ˆˆˆˆ: I(u,v), j = {z′ j|z′ j ∈ p′ j}, u = ⌊ x′ j − Xmin g ⌋, v = ⌊ y′ j − Ymin g ⌋, (2) where I(u,v), j stores a set of point’s height in the pillar located at (u, v), and g denotes grid resolution. Following [25], we project the Ij into a single-channel BEV image B j of size H×W. For each pixel value B(u,v),j, we use the diﬀerence between the maximum and minimum height within the same pillar, calculating as: B(u,v), j = Max{I(u,v), j} − Min{I(u,v), j} (3) 3) Motion Features Encoding: We take the BEV residuals R ∈ RH×W×(N−1) between B0 and B1, . . . , BN−1 as the motion features in the BEV space, calculated by R(u,v), j→0 = B(u,v),0 − B(u,v),j, j ∈ 1, . . . , N − 1, (4) where R(u,v) represents the residual value for pixel at (u, v). To obtain motion features for each point in the 3D space, we perform back-projection by assigning the BEV residual value to all points projected to the BEV pixel. Points within the same pillar will share the same residual value for each residual image. Finally, we obtain point-wise motion fea- tures Fm ∈ RM×(N−1). We concatenate the Fm and current scan’s spatial features, i.e., [x, y, z, intensity], generating a new features Fsp ∈ RM×(N+3) as the input for subsequent backbone. The extracted motion features visualization is presented in Fig. 4. Our approach can obtain initial motion cues for Authorized licensed use limited to: Hebei University of Technology. Downloaded on December 17,2025 at 07:34:24 UTC from IEEE Xplore.  Restrictions apply.
@@ -82,8 +80,6 @@ WANG et al.: SegNet4D: EFFICIENT INSTANCE-AWARE 4D SEMANTIC SEGMENTATION 15343 F
 
 ---
 
-## Method
-
 ### C. Motion Head and Semantic Head
 
 Existing 4D semantic segmentation methods usually predict all semantic class labels in an end-to-end manner, including those moving and static classes. However, since static points typically outnumber moving ones in existing datasets, these approaches often result in suboptimal network performance in identifying moving classes. So we employ two distinct heads for predicting moving labels and single-scan semantic labels separately. By explicitly supervising MOS, our method can maintain superior performance for moving object recognition. To maintain the network’s lightweight characteristics, these heads consist solely of a convolutional layer, a normalization layer, an activation function layer, and a linear layer, which are employed to further classify features with diﬀerent attributes. Finally, we can obtain point-wise motion features F′ m ∈ RM×16 and semantic features F′ s ∈ RM×32, which are utilized for the subsequent fusion to enable 4D semantic segmentation. Where 16 and 32 denotes the number of feature channel. Naturally, the motion head and semantic head also generate point-wise motion predictions F′′ m ∈ RM×3 and semantic predictions F′′ s ∈ RM×C by applying an additional linear layer and a softmax function. Note that 3 represents three diﬀerent motion classes, namely unlabeled, static, and moving, while C denotes the number of static semantic categories. Each head is supervised with a speciﬁc loss function. Further details are provided in Sec. III-F. D. Motion-Semantic Fusion Module After obtaining motion labels and single-scan semantic labels, a straightforward approach to achieve 4D semantic Authorized licensed use limited to: Hebei University of Technology. Downloaded on December 17,2025 at 07:34:24 UTC from IEEE Xplore.  Restrictions apply.
@@ -96,8 +92,6 @@ Existing 4D semantic segmentation methods usually predict all semantic class lab
 <!-- This section is reserved for detailed Chinese analysis -->
 
 ---
-
-## Method
 
 ### F. Loss Function
 
@@ -114,8 +108,6 @@ WANG et al.: SegNet4D: EFFICIENT INSTANCE-AWARE 4D SEMANTIC SEGMENTATION 15345 T
 
 ---
 
-## Method
-
 ### B. Evaluation for Moving Object Segmentation
 
 We evaluate the result on the SemanticKITTI-MOS bench- mark and nuScenes dataset, and compare it with SOTA MOS methods, including (a) projection-based: LMNet [21], MotionSeg3D [22], RVMOS [2], MotionBEV [25] and MF- MOS [23]; (b) point-based: 4DMOS [26] and InsMOS [17]; as well as open-source 4D segmentation baselines: KPConv [9], SpSequenceNet [11], Cylinder3D [1] and MarS3D [13]. The quantitative comparison is presented in Tab. III. Our method achieves the best results on both the SemanticKITTI and nuScenes dataset, demonstrating its superior performance in motion segmentation. SegNet4D also shows improved per- formance compared to original InsMOS [17], indicating that semantic information is beneﬁcial for the identiﬁcation of moving objects, as it provides a vital cue for distinguishing Authorized licensed use limited to: Hebei University of Technology. Downloaded on December 17,2025 at 07:34:24 UTC from IEEE Xplore.  Restrictions apply.
@@ -128,8 +120,6 @@ WANG et al.: SegNet4D: EFFICIENT INSTANCE-AWARE 4D SEMANTIC SEGMENTATION 15347 T
 <!-- This section is reserved for detailed Chinese analysis -->
 
 ---
-
-## Method
 
 ### D. Ablation Study
 
@@ -144,8 +134,6 @@ In this section, we conduct a series of ablation experiments on our framework an
 
 ---
 
-## Method
-
 ### E. Runtime Analysis
 
 To thoroughly assess the computational eﬃciency of our proposed network, we conduct a comprehensive analysis of its inference time, parameter count, and ﬂoating-point operations (FLOPs) utilizing a single NVIDIA 3090 GPU, benchmarking against all open-source 4D semantic segmentation networks. As shown in Tab. VI, our method achieves the fastest runtime on both the SemanticKITTI and nuScenes datasets, while also exhibiting the lowest FLOPs, demonstrating its superior computational eﬃciency. Furthermore, our network comprises 35.7M parameters, indicating small memory consumption suit- able for limited onboard resources.
@@ -156,8 +144,6 @@ To thoroughly assess the computational eﬃciency of our proposed network, we co
 <!-- This section is reserved for detailed Chinese analysis -->
 
 ---
-
-## Method
 
 ### V. CONCLUSION AND FUTURE WORK
 
@@ -839,7 +825,7 @@ Below are all images extracted from the paper, grouped by page number.
 
 ## 说明 (Notes)
 
-- **提取日期 (Extraction Date):** 2026-01-28 09:05:19
+- **提取日期 (Extraction Date):** 2026-01-28 09:09:17
 - **章节数量 (Number of Sections):** 11
 - **图片数量 (Number of Images):** 157
 
