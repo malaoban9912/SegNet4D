@@ -1,3 +1,8 @@
 # Generated paper extraction outputs
 docs/SegNet4D_paper_extracted.md
 docs/paper_images/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
