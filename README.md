@@ -245,7 +245,7 @@ Neng Wang: nwang@nudt.edu.cn and Xieyuanli Chen: xieyuanli.chen@nudt.edu.cn
 ## Documentation
 
 For a comprehensive review of pillar-based BEV methods and related work, please refer to:
-- [参考文献及发展（Literature Review）](./docs/参考文献及发展.md) - A comprehensive Chinese survey of pillar-based BEV methods from PointPillars to recent advances
+- [参考文献及发展（Literature Review and Development）](./docs/参考文献及发展.md) - A comprehensive Chinese survey of pillar-based BEV methods from PointPillars to recent advances
 
 ## Acknowledgment
 
