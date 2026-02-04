@@ -101,6 +101,56 @@
 
 ---
 
+### 6. **REALTIME_DEPLOYMENT_GUIDE.md** ⭐⭐⭐ (实时部署指南)
+**简介**: 如何在没有先验位姿的实时环境中部署SegNet4D的完整指南。
+
+**内容**:
+- **核心问题回答**
+  - 能否在没有先验位姿下实现语义分割？（答案：可以，但有性能权衡）
+  - 推荐的实时位姿估计算法（LIO-SAM、FAST-LIO2、LeGO-LOAM等）
+- **推荐算法详细对比**
+  - 🥇 LIO-SAM（首选，0.5-1.0%误差，-1~2% mIoU影响）
+  - 🥈 FAST-LIO2（次选，计算效率高）
+  - 🥉 LeGO-LOAM（备选，纯LiDAR）
+  - 完整的技术规格、集成难度、性能预期
+- **完整集成指南**
+  - LIO-SAM集成步骤（安装、配置、集成代码）
+  - FAST-LIO2集成步骤
+  - 修改SegNet4D接受实时位姿的代码示例
+  - ROS集成方案
+- **性能分析**
+  - 位姿精度对SegNet4D性能影响的详细表格
+  - mIoU和MOS性能预期
+  - 累积误差分析
+- **系统架构和最佳实践**
+  - 推荐的实时部署架构图
+  - 硬件配置建议（最低和推荐）
+  - 软件优化策略（TensorRT、并行处理等）
+  - 鲁棒性提升方案
+- **完整代码示例**
+  - RealtimeSegNet4DDataset类实现
+  - 实时推理脚本
+  - 完整的最小可运行系统（450+行代码）
+- **常见问题与解决方案**
+  - 位姿估计失败处理
+  - 实时性能优化
+  - 系统验证方法
+
+**推荐人群**: 
+- **必读** - 需要在真实场景部署SegNet4D的工程师
+- 研究实时语义分割系统的研究人员
+- 开发自动驾驶感知系统的开发者
+
+**阅读时间**: ~40-50分钟
+
+**关键价值**:
+- 提供生产级部署方案
+- 包含完整可运行代码
+- 详细的性能预期和权衡分析
+- 解决实际部署中的常见问题
+
+---
+
 ## 🎯 快速导航
 
 ### 如果您想要...
@@ -114,6 +164,8 @@
 **通过图表理解流程** → 阅读 [ARCHITECTURE_DIAGRAM.md](./ARCHITECTURE_DIAGRAM.md)
 
 **了解数据集位姿算法** → 阅读 [DATASET_POSE_ALGORITHMS.md](./DATASET_POSE_ALGORITHMS.md)
+
+**实时部署SegNet4D** ⭐ → 阅读 [REALTIME_DEPLOYMENT_GUIDE.md](./REALTIME_DEPLOYMENT_GUIDE.md)
 
 **了解原始项目** → 阅读 [README.md](./README.md)
 
@@ -155,6 +207,13 @@
 3. DATASET_POSE_ALGORITHMS.md (深入了解数据集位姿算法)
 4. PROJECT_ANALYSIS_ZH.md 或 PROJECT_ANALYSIS_EN.md (深入细节)
 
+**实时部署**:
+1. **REALTIME_DEPLOYMENT_GUIDE.md** ⭐ (必读 - 生产级部署方案)
+   - 回答：没有先验位姿能否使用SegNet4D？
+   - 推荐的实时位姿估计算法
+   - 完整的集成代码和步骤
+2. DATASET_POSE_ALGORITHMS.md (了解位姿估计算法原理)
+
 **代码学习**:
 1. 阅读 PROJECT_ANALYSIS_ZH.md 的"数据加载详细流程"部分
 2. 查看源代码: `dataloader/datasets.py` 的 `read_poses()` 和 `transform_point_cloud()` 方法
@@ -165,6 +224,7 @@
 1. 阅读 DATASET_POSE_ALGORITHMS.md 了解KITTI和nuScenes的位姿算法
 2. 查看LOAM、LeGO-LOAM等经典算法的原理
 3. 理解为什么SegNet4D选择使用数据集提供的位姿
+4. 阅读 REALTIME_DEPLOYMENT_GUIDE.md 了解实时替代方案
 
 ---
 
