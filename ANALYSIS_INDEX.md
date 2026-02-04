@@ -71,6 +71,36 @@
 
 ---
 
+### 5. **DATASET_POSE_ALGORITHMS.md** ⭐ (数据集位姿算法详解)
+**简介**: 深入解析KITTI和nuScenes数据集使用的LiDAR扫描配准和位姿估计算法。
+
+**内容**:
+- **KITTI Odometry Dataset位姿估计方法**
+  - GPS/IMU (OXTS RT3003) 系统详解
+  - 研究社区常用的LiDAR里程计算法（LOAM、LeGO-LOAM、ICP、NDT）
+  - KITTI Odometry Benchmark评估标准
+- **nuScenes Dataset位姿估计方法**
+  - 多传感器融合定位系统架构
+  - ego_pose数据结构和精度
+  - 从ego_pose到LiDAR pose的转换
+- **两个数据集的详细对比**
+- **SegNet4D如何使用这些位姿**
+- **学术论文参考**
+
+**推荐人群**: 
+- 想深入了解数据集位姿来源的研究者
+- 对SLAM和里程计算法感兴趣的读者
+- 需要理解位姿估计技术细节的开发者
+
+**阅读时间**: ~25分钟
+
+**关键发现**:
+- KITTI使用高精度GPS/IMU系统，研究社区用LOAM等算法
+- nuScenes使用多传感器融合（GPS/IMU/编码器）
+- SegNet4D使用数据集提供的ground truth位姿（比纯LiDAR精度更高）
+
+---
+
 ## 🎯 快速导航
 
 ### 如果您想要...
@@ -82,6 +112,8 @@
 **深入理解项目（English）** → 阅读 [PROJECT_ANALYSIS_EN.md](./PROJECT_ANALYSIS_EN.md)
 
 **通过图表理解流程** → 阅读 [ARCHITECTURE_DIAGRAM.md](./ARCHITECTURE_DIAGRAM.md)
+
+**了解数据集位姿算法** → 阅读 [DATASET_POSE_ALGORITHMS.md](./DATASET_POSE_ALGORITHMS.md)
 
 **了解原始项目** → 阅读 [README.md](./README.md)
 
@@ -120,13 +152,19 @@
 **初次阅读**:
 1. SUMMARY.md (快速了解答案)
 2. ARCHITECTURE_DIAGRAM.md (通过图表理解流程)
-3. PROJECT_ANALYSIS_ZH.md 或 PROJECT_ANALYSIS_EN.md (深入细节)
+3. DATASET_POSE_ALGORITHMS.md (深入了解数据集位姿算法)
+4. PROJECT_ANALYSIS_ZH.md 或 PROJECT_ANALYSIS_EN.md (深入细节)
 
 **代码学习**:
 1. 阅读 PROJECT_ANALYSIS_ZH.md 的"数据加载详细流程"部分
 2. 查看源代码: `dataloader/datasets.py` 的 `read_poses()` 和 `transform_point_cloud()` 方法
 3. 阅读 ARCHITECTURE_DIAGRAM.md 的"点云配准详细流程"
 4. 对照代码理解整个流程
+
+**算法研究**:
+1. 阅读 DATASET_POSE_ALGORITHMS.md 了解KITTI和nuScenes的位姿算法
+2. 查看LOAM、LeGO-LOAM等经典算法的原理
+3. 理解为什么SegNet4D选择使用数据集提供的位姿
 
 ---
 
